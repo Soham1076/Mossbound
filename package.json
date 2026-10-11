@@ -1,0 +1,10 @@
+{
+  "name": "mossbound",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A tiny procedural two-player survival arena, served on your local network.",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
+
