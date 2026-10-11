@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101913">
+  <title>Mossbound — a tiny wild world</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Mossbound home">
+        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span class="brand-name">mossbound</span>
+        <span class="brand-tag">a tiny wild world</span>
+      </a>
+      <div class="top-right">
+        <span class="connection"><i></i><span id="connectionText">Connecting</span></span>
+        <span class="round-pill"><span class="live-dot"></span> SHARED WORLD</span>
+      </div>
+    </header>
+
+    <section class="game-layout" aria-label="Game">
+      <aside class="rail left-rail">
+        <div class="rail-label">THE GROVE</div>
+        <div class="round-card">
+          <span class="eyebrow">ROUND ENDS IN</span>
+          <div class="timer" id="timer">02:00</div>
+          <div class="round-note" id="roundNote">Waiting for a second player</div>
+          <div class="timer-track"><span id="timerFill"></span></div>
+        </div>
+
+        <div class="players-card">
+          <div class="card-heading"><span>PLAYERS</span><span id="playerCount">0 / 2</span></div>
+          <div id="playerList" class="player-list"></div>
+          <div class="invite-hint"><span class="invite-icon">↗</span><span>Bring a friend onto the same Wi-Fi to start the round.</span></div>
+        </div>
+
+        <div class="help-card">
+          <div class="card-heading">YOUR KEYS</div>
+          <div class="key-row"><span class="keycap">W</span><span class="keycap">A</span><span class="keycap">S</span><span class="keycap">D</span><span class="key-description">move</span></div>
+          <div class="key-row"><span class="keycap action-key">I</span><span class="key-description">attack</span><span class="keycap action-key">O</span><span class="key-description">collect</span></div>
+          <div class="key-row"><span class="keycap action-key">P</span><span class="key-description">emote · yeah! / GG</span></div>
+        </div>
+      </aside>
+
+      <section class="world-column">
+        <div class="world-topline">
+          <div><span class="location-mark">✳</span> <span id="location">The Fernwild</span><span class="coordinates" id="coordinates">0, 0</span></div>
+          <div class="world-tip">GATHER · GROW · OUTPLAY</div>
+        </div>
+        <div class="canvas-wrap" id="canvasWrap">
+          <canvas id="world" aria-label="Procedural multiplayer world"></canvas>
+          <div class="join-screen" id="joinScreen">
+            <div class="join-card">
+              <div class="join-spark">✳</div>
+              <div class="eyebrow">A SMALL WORLD, SHARED</div>
+              <h1>Meet me<br><em>in the grove.</em></h1>
+              <p>Gather what you can. Keep what you find. When the clock runs out, the richest wanderer wins.</p>
+              <form id="joinForm">
+                <label for="playerName">YOUR WANDERER NAME</label>
+                <input id="playerName" name="name" maxlength="16" placeholder="e.g. Fern" autocomplete="nickname">
+                <button type="submit" class="join-button">Enter the world <span>↗</span></button>
+              </form>
+              <div class="join-foot"><span class="live-dot"></span> Shared with anyone on your local network</div>
+            </div>
+          </div>
+          <div id="toast" class="toast" aria-live="polite"></div>
+          <div class="touch-controls" id="touchControls" aria-label="Touch controls">
+            <div class="dpad" aria-label="Move"><button data-move="up" aria-label="Move up">▲</button><button data-move="left" aria-label="Move left">◀</button><button data-move="down" aria-label="Move down">▼</button><button data-move="right" aria-label="Move right">▶</button></div>
+            <div class="touch-actions"><button data-action="attack"><b>I</b><span>HIT</span></button><button data-action="collect"><b>O</b><span>TAKE</span></button><button data-action="emote"><b>P</b><span>EMOTE</span></button></div>
+          </div>
+          <div id="gameOver" class="game-over hidden">
+            <div class="join-card result-card">
+              <div class="eyebrow">THE GROVE HAS SPOKEN</div>
+              <h2 id="winnerText">A winner emerges.</h2>
+              <p id="winnerScore"></p>
+              <div class="result-note">Gold and diamonds decide the score.</div>
+              <button type="button" class="join-button restart-button" id="restartButton">Restart game <span>↻</span></button>
+            </div>
+          </div>
+        </div>
+        <div class="world-footer"><span><b class="legend-dot wood"></b>wood <b class="legend-dot stone"></b>stone <b class="legend-dot gold"></b>gold <b class="legend-dot diamond"></b>diamond</span><span class="footer-message" id="footerMessage">Find a glint in the trees.</span></div>
+      </section>
+
+      <aside class="rail right-rail">
+        <div class="rail-label">YOUR PACK <span class="pack-weight" id="packWeight">0 carried</span></div>
+        <div class="inventory-card">
+          <div class="inventory-row"><span class="resource-icon wood-icon">⌁</span><span class="resource-name">Wood</span><span class="resource-value" id="woodCount">0</span></div>
+          <div class="inventory-row"><span class="resource-icon stone-icon">◆</span><span class="resource-name">Stone</span><span class="resource-value" id="stoneCount">0</span></div>
+          <div class="inventory-row"><span class="resource-icon gold-icon">✦</span><span class="resource-name">Gold</span><span class="resource-value" id="goldCount">0</span></div>
+          <div class="inventory-row"><span class="resource-icon diamond-icon">◇</span><span class="resource-name">Diamond</span><span class="resource-value" id="diamondCount">0</span></div>
+          <div class="bag-total"><span>ROUND SCORE</span><strong id="scoreCount">0</strong></div>
+        </div>
+        <div class="power-card">
+          <div class="card-heading">ATTACK POWER <span id="powerLevel">I</span></div>
+          <div class="power-meter" id="powerMeter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="power-caption" id="powerCaption">Pick up wood &amp; stone to hit harder</div>
+        </div>
+        <div class="objective-card">
+          <div class="objective-icon">✺</div>
+          <div class="eyebrow">THE WAY TO WIN</div>
+          <p>Break a node with <b>I</b>, then scoop up the glint with <b>O</b>.</p>
+          <div class="score-rule"><span>Gold + diamonds</span><span>✦ = 1 point</span></div>
+        </div>
+        <div class="lan-card" id="lanCard"><span class="lan-symbol">⌘</span><span><b>PLAY TOGETHER</b><small id="lanText">Open this address on another device.</small></span></div>
+      </aside>
+    </section>
+
+    <footer class="bottom-bar"><span>AN ENDLESS LITTLE PLACE <i>·</i> SEED <b id="seedText">—</b></span><span>Built for two. Made for a rematch.</span></footer>
+  </main>
+  <script src="/game.js"></script>
+</body>
+</html>
+
