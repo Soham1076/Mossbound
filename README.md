@@ -13,6 +13,12 @@ The game server listens on all network interfaces at port `8080`. Players share 
 
 After the results appear, either player can choose **Restart game**. This resets the shared world and returns connected devices to the main menu with a fresh timer and empty packs.
 
+## Publish a 24/7 website
+
+The repository includes a Render Blueprint in `render.yaml` for the always-on Node.js game server. To publish it, create a Render account, choose **New → Blueprint**, connect `Soham1076/Mossbound`, and review the service before deploying. Render will provide a public HTTPS address that players can open from separate devices. Later pushes to `main` deploy automatically.
+
+The Blueprint uses one Singapore server instance because the shared match state is held in that server's memory. The smallest Render plan that stays on is currently **$7 USD/month**; Render's free web service sleeps after 15 minutes without incoming traffic, so it does not meet the 24/7 requirement. The Hobby workspace is free, but bandwidth above its included allowance may cost extra. A server restart or code deploy clears the current in-memory match and world; player accounts and long-term saves are not part of the game yet.
+
 ## Controls
 
 - **WASD** or **arrow keys** — move
@@ -30,3 +36,4 @@ node server.js
 ```
 
 Then visit `http://localhost:8080`. Stop the host with **Ctrl+C**.
+
