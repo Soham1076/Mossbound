@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: mossbound-world-soham
+    runtime: node
+    plan: 0.5c-512mb
+    region: singapore
+    branch: main
+    numInstances: 1
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+
