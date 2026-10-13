@@ -77,3 +77,8 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: auto; }
 @media (max-width: 740px) { .shell { padding: 0 12px; }.topbar { height: 57px; }.round-pill { display: none; }.game-layout { grid-template-columns: 1fr 1fr; gap: 12px; padding: 16px 0 14px; }.world-column { grid-column: 1 / -1; grid-row: 1; }.canvas-wrap { min-height: min(62vh, 520px); }.left-rail, .right-rail { display: grid; grid-template-columns: 1fr 1fr; align-items: stretch; }.rail-label { grid-column: 1 / -1; }.round-card, .players-card { min-height: 127px; }.players-card { grid-row: span 2; }.help-card { min-height: 114px; }.right-rail .objective-card { min-height: 128px; }.lan-card { min-height: 58px; }.world-tip { display: none; }.world-footer { height: 25px; font-size: 8px; }.bottom-bar { font-size: 7px; }.footer-message { display: none; }.join-card { padding: 22px; }.join-card h1 { font-size: 30px; } }
 @media (max-width: 430px) { .game-layout { grid-template-columns: 1fr; }.world-column { grid-column: 1; }.canvas-wrap { min-height: 58vh; }.left-rail, .right-rail { grid-template-columns: 1fr 1fr; }.players-card { min-height: 144px; }.world-topline { font-size: 10px; }.coordinates { margin-left: 6px; }.bottom-bar span:last-child { display: none; } }
 
+button, input, select { font: inherit; }
+.join-card select { width: 100%; height: 39px; border: 1px solid #3a4a39; border-radius: 5px; outline: none; color: #e4ecdd; background: #111a13; padding: 0 11px; font-size: 11px; }
+.join-card select:focus { border-color: #9abe74; }
+.join-card .opponent-label { margin-top: 12px; }
+.opponent-note { color: #788778; font-size: 9px; line-height: 1.45; margin-top: 6px; }
