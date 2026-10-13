@@ -13,9 +13,9 @@
   let playerName = localStorage.getItem('mossbound.playerName') || '';
   let worldSeed = 1;
   let lastSelfMessage = '';
-  let lastStateAt = performance.now();
   let lastState = null;
   const renderPositions = new Map();
+  let lastRenderFrameAt = performance.now();
   let toastTimer = 0;
   let timerValue = -1;
   let lastInputSent = '';
@@ -110,10 +110,9 @@
   function applyState(next) {
     if (!next) return;
     const now = performance.now();
-    syncRenderPositions(next, now);
+    syncRenderPositions(next);
     state = next;
     lastState = next;
-    lastStateAt = now;
     worldSeed = next.seed || 1;
     $('seedText').textContent = worldSeed.toString(16).toUpperCase().padStart(6, '0');
     const self = next.players.find((p) => p.id === next.you);
@@ -170,48 +169,39 @@
     }
   }
 
-  function syncRenderPositions(next, now) {
-    const duration = Math.max(70, Math.min(160, now - lastStateAt));
+  function syncRenderPositions(next) {
     const activeIds = new Set();
     for (const player of next.players) {
       activeIds.add(player.id);
       const previous = renderPositions.get(player.id);
-      const shown = previous ? samplePosition(previous, now) : { x: player.x, y: player.y };
-      const jump = Math.hypot(player.x - shown.x, player.y - shown.y);
-      if (!previous || !previous.alive || !player.alive || jump > 320) {
+      const jump = previous ? Math.hypot(player.x - previous.targetX, player.y - previous.targetY) : Infinity;
+      if (!previous || previous.alive !== player.alive || jump > 320) {
         renderPositions.set(player.id, {
-          fromX: player.x, fromY: player.y, toX: player.x, toY: player.y,
-          startedAt: now, duration, alive: player.alive,
+          x: player.x, y: player.y, targetX: player.x, targetY: player.y, alive: player.alive,
         });
       } else {
-        renderPositions.set(player.id, {
-          fromX: shown.x, fromY: shown.y, toX: player.x, toY: player.y,
-          startedAt: now, duration, alive: player.alive,
-        });
+        previous.targetX = player.x;
+        previous.targetY = player.y;
       }
     }
     for (const id of renderPositions.keys()) if (!activeIds.has(id)) renderPositions.delete(id);
   }
 
-  function samplePosition(track, now) {
-    const progress = Math.max(0, Math.min(1, (now - track.startedAt) / track.duration));
-    return {
-      x: track.fromX + (track.toX - track.fromX) * progress,
-      y: track.fromY + (track.toY - track.fromY) * progress,
-    };
+  function advanceRenderPositions(now) {
+    const elapsed = Math.min(50, Math.max(0, now - lastRenderFrameAt));
+    lastRenderFrameAt = now;
+    const blend = 1 - Math.exp(-elapsed / 38);
+    for (const track of renderPositions.values()) {
+      track.x += (track.targetX - track.x) * blend;
+      track.y += (track.targetY - track.y) * blend;
+      if (Math.abs(track.targetX - track.x) < 0.05) track.x = track.targetX;
+      if (Math.abs(track.targetY - track.y) < 0.05) track.y = track.targetY;
+    }
   }
 
-  function displayedPosition(player, now) {
-    if (player.id === state.you && player.alive) {
-      let x = Number(pressed.has('right')) - Number(pressed.has('left'));
-      let y = Number(pressed.has('down')) - Number(pressed.has('up'));
-      const length = Math.hypot(x, y) || 1;
-      const predictionMs = Math.min(100, Math.max(0, now - lastStateAt));
-      const distance = (player.speed || 225) * predictionMs / 1000;
-      return { x: player.x + (x / length) * distance, y: player.y + (y / length) * distance };
-    }
+  function displayedPosition(player) {
     const track = renderPositions.get(player.id);
-    return track ? samplePosition(track, now) : { x: player.x, y: player.y };
+    return track ? { x: track.x, y: track.y } : { x: player.x, y: player.y };
   }
 
   function returnToMenu() {
@@ -345,7 +335,8 @@
   function draw() {
     const { width, height } = resizeCanvas();
     const now = performance.now();
-    const displayedPlayers = state?.players.map((p) => ({ ...p, ...displayedPosition(p, now) })) || [];
+    advanceRenderPositions(now);
+    const displayedPlayers = state?.players.map((p) => ({ ...p, ...displayedPosition(p) })) || [];
     const self = displayedPlayers.find((p) => p.id === state.you);
     const camX = self?.x || 0;
     const camY = self?.y || 0;
