@@ -16,6 +16,12 @@ let matchStartedAt = null;
 let matchEndedAt = null;
 let dropSequence = 0;
 
+const BOT_DIFFICULTIES = {
+  easy: { label: 'Easy', name: 'Sprout', speed: 150, thinkMs: 300, attackCooldownMs: 850, damageScale: 0.72, nodeBonus: 0, chaseRange: 0, strengthGoal: 12, retreatAt: 25 },
+  medium: { label: 'Medium', name: 'Moss', speed: 190, thinkMs: 180, attackCooldownMs: 570, damageScale: 1, nodeBonus: 0, chaseRange: 380, strengthGoal: 8, retreatAt: 18 },
+  hard: { label: 'Hard', name: 'Bramble', speed: 220, thinkMs: 100, attackCooldownMs: 440, damageScale: 1.1, nodeBonus: 1, chaseRange: 950, strengthGoal: 4, retreatAt: 0 },
+};
+
 const TYPES = {
   wood: { name: 'Wood', maxHp: 3 },
   stone: { name: 'Stone', maxHp: 4 },
@@ -117,7 +123,7 @@ function stateFor(id) {
     id: p.id, name: p.name, x: p.x, y: p.y, hp: p.hp, alive: p.alive,
     inventory: p.inventory, emote: p.emote && p.emote.expiresAt > Date.now() ? p.emote.text : null,
     emoteUntil: p.emote?.expiresAt || 0, respawnAt: p.respawnAt || 0,
-    facing: p.facing,
+    facing: p.facing, isBot: Boolean(p.isBot), difficulty: p.isBot ? p.difficulty : null,
   }));
   const roster = currentPlayers.map((p) => ({ ...p, isSelf: p.id === id }));
   const remain = matchStartedAt === null
@@ -180,7 +186,7 @@ function act(p, action) {
   if (!p.alive || matchEndedAt !== null) return;
   const now = Date.now();
   if (action === 'attack') {
-    if (now - p.lastAttack < 430) return;
+    if (now - p.lastAttack < (p.attackCooldownMs || 430)) return;
     p.lastAttack = now;
     const enemy = activePlayers()
       .filter((other) => other.id !== p.id && other.alive)
@@ -188,7 +194,7 @@ function act(p, action) {
       .filter((item) => item.distance <= 72)
       .sort((a, b) => a.distance - b.distance)[0];
     const muscle = p.inventory.wood + p.inventory.stone;
-    const damage = 16 + Math.floor(muscle / 4) * 4;
+    const damage = Math.max(1, Math.floor((16 + Math.floor(muscle / 4) * 4) * (p.damageScale || 1)));
     if (enemy) {
       const target = enemy.target;
       target.hp = Math.max(0, target.hp - damage);
@@ -205,6 +211,7 @@ function act(p, action) {
         target.inventory = { wood: 0, stone: 0, gold: 0, diamond: 0 };
         target.alive = false;
         target.respawnAt = now + 3000;
+        target.input = { x: 0, y: 0 };
         target.x += (Math.random() - 0.5) * 16;
         target.y += (Math.random() - 0.5) * 16;
         say(target, 'Down! Respawning in 3…');
@@ -215,7 +222,7 @@ function act(p, action) {
     const nearest = closestTarget(p, 78, () => true);
     if (!nearest) { say(p, 'Nothing in reach'); return; }
     const n = nearest.target;
-    n.hp -= 1 + Math.floor(muscle / 8);
+    n.hp -= 1 + Math.floor(muscle / 8) + (p.isBot ? p.nodeBonus : 0);
     if (n.hp <= 0) {
       n.gone = true;
       dropResource(n.type, n.x, n.y, 1 + (n.type === 'wood' ? Math.floor(Math.random() * 2) : 0));
@@ -238,6 +245,93 @@ function act(p, action) {
     p.emote = { text, expiresAt: now + 2300 };
     p.message = null;
   }
+}
+
+function createBot(difficulty, nearPlayer) {
+  const settings = BOT_DIFFICULTIES[difficulty];
+  const angle = Math.random() * Math.PI * 2;
+  const distance = 115 + Math.random() * 35;
+  const bot = {
+    id: `bot-${crypto.randomBytes(10).toString('hex')}`,
+    name: settings.name,
+    x: nearPlayer.x + Math.cos(angle) * distance,
+    y: nearPlayer.y + Math.sin(angle) * distance,
+    vx: 0, vy: 0, speed: settings.speed,
+    hp: 100, alive: true, inventory: { wood: 0, stone: 0, gold: 0, diamond: 0 },
+    input: { x: 0, y: 0 }, facing: 0, lastSeen: Date.now(), lastAttack: 0,
+    respawnAt: 0, emoteIndex: -1, emote: null, message: null,
+    isBot: true, difficulty, attackCooldownMs: settings.attackCooldownMs,
+    damageScale: settings.damageScale, nodeBonus: settings.nodeBonus,
+    thinkMs: settings.thinkMs, nextThinkAt: 0, strengthGoal: settings.strengthGoal,
+    chaseRange: settings.chaseRange, retreatAt: settings.retreatAt,
+  };
+  players.set(bot.id, bot);
+  return bot;
+}
+
+function thinkBot(bot, now) {
+  bot.lastSeen = now;
+  if (!bot.alive || matchEndedAt !== null || now < bot.nextThinkAt) return;
+  bot.nextThinkAt = now + bot.thinkMs;
+  chunksNear(bot.x, bot.y, 520);
+
+  const humans = activePlayers().filter((p) => !p.isBot && p.alive);
+  const enemy = humans
+    .map((p) => ({ target: p, distance: Math.hypot(p.x - bot.x, p.y - bot.y) }))
+    .sort((a, b) => a.distance - b.distance)[0];
+  const moveToward = (x, y) => {
+    const dx = x - bot.x; const dy = y - bot.y;
+    const length = Math.hypot(dx, dy) || 1;
+    bot.input = { x: dx / length, y: dy / length };
+    bot.facing = Math.atan2(dy, dx);
+  };
+
+  if (bot.hp <= bot.retreatAt && enemy && enemy.distance < 250) {
+    moveToward(bot.x + (bot.x - enemy.target.x), bot.y + (bot.y - enemy.target.y));
+    return;
+  }
+
+  if (enemy && enemy.distance <= 72) {
+    bot.input = { x: 0, y: 0 };
+    act(bot, 'attack');
+    return;
+  }
+
+  const closeDrop = [...drops.values()]
+    .filter((d) => d.expiresAt > now && Math.hypot(d.x - bot.x, d.y - bot.y) <= 520)
+    .sort((a, b) => Math.hypot(a.x - bot.x, a.y - bot.y) - Math.hypot(b.x - bot.x, b.y - bot.y))[0];
+  if (closeDrop) {
+    const distance = Math.hypot(closeDrop.x - bot.x, closeDrop.y - bot.y);
+    if (distance <= 74) {
+      bot.input = { x: 0, y: 0 };
+      act(bot, 'collect');
+    } else {
+      moveToward(closeDrop.x, closeDrop.y);
+    }
+    return;
+  }
+  if (enemy && bot.chaseRange > 0 && enemy.distance <= bot.chaseRange && bot.hp > bot.retreatAt) {
+    moveToward(enemy.target.x, enemy.target.y);
+    return;
+  }
+
+  const muscle = bot.inventory.wood + bot.inventory.stone;
+  const wantsStrength = muscle < bot.strengthGoal;
+  const preferred = wantsStrength ? ['wood', 'stone'] : ['gold', 'diamond'];
+  let target = closestTarget(bot, 520, (node) => preferred.includes(node.type));
+  if (!target) target = closestTarget(bot, 520, () => true);
+  if (target) {
+    if (target.distance <= 78) {
+      bot.input = { x: 0, y: 0 };
+      moveToward(target.target.x, target.target.y);
+      if (target.distance <= 72) act(bot, 'attack');
+    } else {
+      moveToward(target.target.x, target.target.y);
+    }
+    return;
+  }
+  if (enemy) moveToward(enemy.target.x, enemy.target.y);
+  else bot.input = { x: 0, y: 0 };
 }
 
 function sendJson(res, status, data) {
@@ -289,7 +383,9 @@ const server = http.createServer(async (req, res) => {
       const body = await readJson(req);
       const requestedId = String(body.id || '');
       let p = players.get(requestedId);
+      let notice = '';
       if (!p) {
+        const humans = activePlayers().filter((other) => !other.isBot);
         const pos = closestSpawn();
         const id = crypto.randomBytes(12).toString('hex');
         p = {
@@ -299,12 +395,20 @@ const server = http.createServer(async (req, res) => {
           respawnAt: 0, emoteIndex: -1, emote: null, message: null,
         };
         players.set(id, p);
+        if (humans.length === 0 && BOT_DIFFICULTIES[body.botDifficulty]) {
+          const bot = createBot(body.botDifficulty, p);
+          notice = `${bot.name} (${BOT_DIFFICULTIES[body.botDifficulty].label}) is ready to play.`;
+        } else if (humans.length > 0) {
+          const bots = activePlayers().filter((other) => other.isBot);
+          for (const bot of bots) players.delete(bot.id);
+          if (bots.length) notice = 'Another wanderer joined, so the bot stepped aside.';
+        }
       } else {
         p.name = safeName(body.name || p.name);
         p.lastSeen = Date.now();
       }
       if (matchStartedAt === null && activePlayers().length >= 2) matchStartedAt = Date.now();
-      return sendJson(res, 200, { id: p.id, state: stateFor(p.id), lan: lanUrls() });
+      return sendJson(res, 200, { id: p.id, state: stateFor(p.id), lan: lanUrls(), notice });
     }
     if (url.pathname === '/api/state' && req.method === 'GET') {
       const p = findPlayer(url.searchParams.get('id'));
@@ -390,6 +494,7 @@ setInterval(() => {
       p.y += Math.sin(angle) * distance;
       say(p, 'Back in the grove');
     }
+    if (p.isBot) thinkBot(p, now);
   }
   for (const [id, d] of drops) if (d.expiresAt <= now) drops.delete(id);
   if (matchStartedAt !== null && matchEndedAt === null && now - matchStartedAt >= ROUND_MS) matchEndedAt = now;
@@ -410,4 +515,3 @@ server.listen(PORT, '0.0.0.0', () => {
   if (links.length) console.log(`Other devices on your Wi-Fi: ${links.join('  ')}`);
   console.log('Press Ctrl+C to stop the game host.');
 });
-
