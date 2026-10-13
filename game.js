@@ -32,9 +32,10 @@
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), keepalive,
   });
 
-  async function join(name) {
-    const response = await post('/api/join', { id: playerId, name });
+  async function join(name, botDifficulty = 'friend') {
+    const response = await post('/api/join', { id: playerId, name, botDifficulty });
     const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Could not enter the world');
     playerId = data.id;
     playerName = name;
     localStorage.setItem('mossbound.playerId', playerId);
@@ -47,24 +48,25 @@
       $('lanText').textContent = 'Open localhost:8080 on this device.';
     }
     applyState(data.state);
-    showToast('Welcome to the Fernwild');
+    showToast(data.notice || 'Welcome to the Fernwild');
     poll();
   }
 
   $('joinForm').addEventListener('submit', async (event) => {
     event.preventDefault();
     const name = $('playerName').value.trim().slice(0, 16) || 'Wanderer';
+    const botDifficulty = $('opponentChoice').value;
     $('playerName').value = name;
     const button = document.querySelector('#joinForm button');
     button.disabled = true;
     button.textContent = 'Finding your place…';
     try {
       playerId = '';
-      await join(name);
-    } catch {
+      await join(name, botDifficulty);
+    } catch (error) {
       button.disabled = false;
       button.innerHTML = 'Try again <span>↗</span>';
-      showToast('Could not reach the world host');
+      showToast(error.message || 'Could not reach the world host');
       setConnection(false);
     }
   });
@@ -133,8 +135,9 @@
       const total = p.inventory.gold + p.inventory.diamond;
       const initial = escapeHtml(p.name.slice(0, 1).toUpperCase());
       const selfTag = p.isSelf ? '<small>YOU</small>' : '';
+      const botTag = p.isBot ? `<small>${escapeHtml(`${p.difficulty[0].toUpperCase()}${p.difficulty.slice(1)}`)} BOT</small>` : '';
       const opacity = p.alive ? '' : ' style="opacity:.52"';
-      return `<div class="player-row"${opacity}><div class="player-avatar ${p.isSelf ? 'self' : ''}">${initial}</div><div><div class="player-row-name">${escapeHtml(p.name)}${selfTag}</div><div class="player-hp"><i style="width:${p.alive ? p.hp : 0}%"></i></div></div><div class="player-row-score">✦ ${total}</div></div>`;
+      return `<div class="player-row"${opacity}><div class="player-avatar ${p.isSelf ? 'self' : ''}">${initial}</div><div><div class="player-row-name">${escapeHtml(p.name)}${selfTag}${botTag}</div><div class="player-hp"><i style="width:${p.alive ? p.hp : 0}%"></i></div></div><div class="player-row-score">✦ ${total}</div></div>`;
     }).join('') || '<div class="round-note">The grove is quiet…</div>';
     const remaining = Math.ceil(next.round.remainingMs / 1000);
     if (remaining !== timerValue) {
@@ -142,8 +145,14 @@
       $('timer').textContent = `${String(Math.floor(remaining / 60)).padStart(2, '0')}:${String(remaining % 60).padStart(2, '0')}`;
     }
     $('timerFill').style.width = `${Math.max(0, Math.min(100, (next.round.remainingMs / 120000) * 100))}%`;
-    $('roundNote').textContent = next.round.started ? 'A little friendly competition' : 'Waiting for a second player';
-    $('footerMessage').textContent = next.round.started ? 'The grove is yours to explore.' : 'A friend can join on the same Wi-Fi.';
+    const bot = next.players.find((p) => p.isBot);
+    const botDifficulty = bot ? `${bot.difficulty[0].toUpperCase()}${bot.difficulty.slice(1)}` : '';
+    $('roundNote').textContent = next.round.started
+      ? (bot ? `Playing vs. ${botDifficulty} bot` : 'A little friendly competition')
+      : 'Waiting for a second player';
+    $('footerMessage').textContent = next.round.started
+      ? (bot ? `Outplay ${bot.name} and claim the grove.` : 'The grove is yours to explore.')
+      : 'A friend can join on the same Wi-Fi.';
     $('location').textContent = 'The Fernwild';
     for (const item of next.messages || []) {
       if (item.id === playerId) {
@@ -187,6 +196,7 @@
     [...$('powerMeter').children].forEach((bar, index) => bar.classList.toggle('on', index === 0));
     $('powerCaption').textContent = 'Pick up wood & stone to hit harder';
     $('playerName').value = playerName || 'Wanderer';
+    $('opponentChoice').value = 'friend';
     const joinButton = document.querySelector('#joinForm button');
     joinButton.disabled = false;
     joinButton.innerHTML = 'Enter the world <span>↗</span>';
@@ -234,12 +244,13 @@
 
   window.addEventListener('keydown', (event) => {
     const key = event.code;
+    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
     if (keyMap[key]) {
       pressed.add(keyMap[key]);
       event.preventDefault();
       return;
     }
-    if (event.repeat || event.target instanceof HTMLInputElement) return;
+    if (event.repeat) return;
     if (key === 'KeyI') { action('attack'); event.preventDefault(); }
     if (key === 'KeyO') { action('collect'); event.preventDefault(); }
     if (key === 'KeyP') { action('emote'); event.preventDefault(); }
@@ -442,4 +453,3 @@
     setReady();
   }
 })();
-
