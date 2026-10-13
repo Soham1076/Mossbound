@@ -15,7 +15,6 @@ const drops = new Map();
 let matchStartedAt = null;
 let matchEndedAt = null;
 let dropSequence = 0;
-let lastTickAt = Date.now();
 
 const BOT_DIFFICULTIES = {
   easy: { label: 'Easy', name: 'Sprout', speed: 150, thinkMs: 300, attackCooldownMs: 850, damageScale: 0.72, nodeBonus: 0, chaseRange: 0, strengthGoal: 12, retreatAt: 25 },
@@ -121,7 +120,7 @@ function stateFor(id) {
     .filter((d) => d.expiresAt > Date.now() && Math.abs(d.x - self.x) < 1050 && Math.abs(d.y - self.y) < 850)
     .map((d) => ({ id: d.id, type: d.type, x: d.x, y: d.y, amount: d.amount }));
   const currentPlayers = activePlayers().map((p) => ({
-    id: p.id, name: p.name, x: p.x, y: p.y, speed: p.speed, hp: p.hp, alive: p.alive,
+    id: p.id, name: p.name, x: p.x, y: p.y, hp: p.hp, alive: p.alive,
     inventory: p.inventory, emote: p.emote && p.emote.expiresAt > Date.now() ? p.emote.text : null,
     emoteUntil: p.emote?.expiresAt || 0, respawnAt: p.respawnAt || 0,
     facing: p.facing, isBot: Boolean(p.isBot), difficulty: p.isBot ? p.difficulty : null,
@@ -476,16 +475,14 @@ function lanUrls() {
 
 setInterval(() => {
   const now = Date.now();
-  const elapsedSeconds = Math.min(0.1, Math.max(0, now - lastTickAt) / 1000);
-  lastTickAt = now;
   for (const p of players.values()) {
     if (now - p.lastSeen > 45_000) {
       players.delete(p.id);
       continue;
     }
     if (p.alive) {
-      p.x += p.input.x * p.speed * elapsedSeconds;
-      p.y += p.input.y * p.speed * elapsedSeconds;
+      p.x += p.input.x * p.speed / 20;
+      p.y += p.input.y * p.speed / 20;
       if (p.input.x || p.input.y) p.facing = Math.atan2(p.input.y, p.input.x);
     } else if (p.respawnAt && now >= p.respawnAt) {
       p.alive = true;
