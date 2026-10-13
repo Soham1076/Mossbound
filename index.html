@@ -61,6 +61,14 @@
               <form id="joinForm">
                 <label for="playerName">YOUR WANDERER NAME</label>
                 <input id="playerName" name="name" maxlength="16" placeholder="e.g. Fern" autocomplete="nickname">
+                <label for="opponentChoice" class="opponent-label">PLAY WITH</label>
+                <select id="opponentChoice" name="opponent">
+                  <option value="friend">Wait for a friend</option>
+                  <option value="easy">Easy bot</option>
+                  <option value="medium">Medium bot</option>
+                  <option value="hard">Hard bot</option>
+                </select>
+                <div class="opponent-note">If no friend is there, pick a bot. A friend can still join your game.</div>
                 <button type="submit" class="join-button">Enter the world <span>↗</span></button>
               </form>
               <div class="join-foot"><span class="live-dot"></span> Shared with anyone on your local network</div>
@@ -113,4 +121,3 @@
   <script src="/game.js"></script>
 </body>
 </html>
-
