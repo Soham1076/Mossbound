@@ -15,6 +15,7 @@
   let lastSelfMessage = '';
   let lastStateAt = performance.now();
   let lastState = null;
+  const renderPositions = new Map();
   let toastTimer = 0;
   let timerValue = -1;
   let lastInputSent = '';
@@ -108,9 +109,11 @@
 
   function applyState(next) {
     if (!next) return;
+    const now = performance.now();
+    syncRenderPositions(next, now);
     state = next;
     lastState = next;
-    lastStateAt = performance.now();
+    lastStateAt = now;
     worldSeed = next.seed || 1;
     $('seedText').textContent = worldSeed.toString(16).toUpperCase().padStart(6, '0');
     const self = next.players.find((p) => p.id === next.you);
@@ -167,11 +170,56 @@
     }
   }
 
+  function syncRenderPositions(next, now) {
+    const duration = Math.max(70, Math.min(160, now - lastStateAt));
+    const activeIds = new Set();
+    for (const player of next.players) {
+      activeIds.add(player.id);
+      const previous = renderPositions.get(player.id);
+      const shown = previous ? samplePosition(previous, now) : { x: player.x, y: player.y };
+      const jump = Math.hypot(player.x - shown.x, player.y - shown.y);
+      if (!previous || !previous.alive || !player.alive || jump > 320) {
+        renderPositions.set(player.id, {
+          fromX: player.x, fromY: player.y, toX: player.x, toY: player.y,
+          startedAt: now, duration, alive: player.alive,
+        });
+      } else {
+        renderPositions.set(player.id, {
+          fromX: shown.x, fromY: shown.y, toX: player.x, toY: player.y,
+          startedAt: now, duration, alive: player.alive,
+        });
+      }
+    }
+    for (const id of renderPositions.keys()) if (!activeIds.has(id)) renderPositions.delete(id);
+  }
+
+  function samplePosition(track, now) {
+    const progress = Math.max(0, Math.min(1, (now - track.startedAt) / track.duration));
+    return {
+      x: track.fromX + (track.toX - track.fromX) * progress,
+      y: track.fromY + (track.toY - track.fromY) * progress,
+    };
+  }
+
+  function displayedPosition(player, now) {
+    if (player.id === state.you && player.alive) {
+      let x = Number(pressed.has('right')) - Number(pressed.has('left'));
+      let y = Number(pressed.has('down')) - Number(pressed.has('up'));
+      const length = Math.hypot(x, y) || 1;
+      const predictionMs = Math.min(100, Math.max(0, now - lastStateAt));
+      const distance = (player.speed || 225) * predictionMs / 1000;
+      return { x: player.x + (x / length) * distance, y: player.y + (y / length) * distance };
+    }
+    const track = renderPositions.get(player.id);
+    return track ? samplePosition(track, now) : { x: player.x, y: player.y };
+  }
+
   function returnToMenu() {
     playerId = '';
     localStorage.removeItem('mossbound.playerId');
     state = null;
     lastState = null;
+    renderPositions.clear();
     lastSelfMessage = '';
     timerValue = 120;
     lastInputSent = '';
@@ -296,7 +344,9 @@
 
   function draw() {
     const { width, height } = resizeCanvas();
-    const self = state?.players.find((p) => p.id === state.you);
+    const now = performance.now();
+    const displayedPlayers = state?.players.map((p) => ({ ...p, ...displayedPosition(p, now) })) || [];
+    const self = displayedPlayers.find((p) => p.id === state.you);
     const camX = self?.x || 0;
     const camY = self?.y || 0;
     const left = camX - width / 2;
@@ -305,7 +355,7 @@
     if (state) {
       for (const node of state.nodes) drawNode(node, left, top);
       for (const drop of state.drops) drawDrop(drop, left, top);
-      for (const p of state.players) drawPlayer(p, left, top);
+      for (const p of displayedPlayers) drawPlayer(p, left, top);
       drawVignette(width, height);
     }
     requestAnimationFrame(draw);
