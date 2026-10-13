@@ -43,10 +43,13 @@
     localStorage.setItem('mossbound.playerName', playerName);
     $('joinScreen').classList.add('hidden');
     setConnection(true);
-    if (data.lan?.length) {
+    const host = window.location.hostname;
+    const localHost = host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.endsWith('.local')
+      || /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host);
+    if (localHost && data.lan?.length) {
       $('lanText').textContent = data.lan.join('  ·  ');
     } else {
-      $('lanText').textContent = 'Open localhost:8080 on this device.';
+      $('lanText').textContent = 'Share this website address with your friend.';
     }
     applyState(data.state);
     showToast(data.notice || 'Welcome to the Fernwild');
@@ -494,3 +497,4 @@
     setReady();
   }
 })();
+
