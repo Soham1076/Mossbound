@@ -379,6 +379,9 @@ const server = http.createServer(async (req, res) => {
     return res.end();
   }
   try {
+    if (url.pathname === '/healthz' && req.method === 'GET') {
+      return sendJson(res, 200, { ok: true });
+    }
     if (url.pathname === '/api/join' && req.method === 'POST') {
       const body = await readJson(req);
       const requestedId = String(body.id || '');
@@ -515,3 +518,4 @@ server.listen(PORT, '0.0.0.0', () => {
   if (links.length) console.log(`Other devices on your Wi-Fi: ${links.join('  ')}`);
   console.log('Press Ctrl+C to stop the game host.');
 });
+
